@@ -295,7 +295,7 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
     // should be a valid DNSSEC record, and switch to known good
     // DNSSEC resolvers if verification fails
     bool available, valid;
-    static const char *probe_hostname = "updates.moneropulse.org";
+    static const char *probe_hostname = "updates.antfodaza.xyz";
     auto records = get_txt_record(probe_hostname, available, valid);
     if (!valid)
     {
@@ -583,7 +583,7 @@ bool load_txt_records_from_dns(std::vector<std::string> &good_records, const std
   good_records = {};
   for (const auto &s: good_record->first)
     good_records.push_back(s);
-  return true;
+  return false;
 }
 
 std::vector<std::string> parse_dns_public(const char *s)

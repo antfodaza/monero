@@ -458,7 +458,7 @@ void message_store::stop_auto_config()
 void message_store::setup_signer_for_auto_config(uint32_t index, const std::string token, bool receiving)
 {
   // It may be a little strange to hash the textual hex digits of the auto config token into
-  // 32 bytes and turn that into a Monero public/secret key pair, instead of doing something
+  // 32 bytes and turn that into a Antdaza public/secret key pair, instead of doing something
   // much less complicated like directly using the underlying random 40 bits as key for a
   // symmetric cipher, but everything is there already for encrypting and decrypting messages
   // with such key pairs, and furthermore it would be trivial to use tokens with a different
@@ -487,7 +487,7 @@ bool message_store::get_signer_index_by_monero_address(const cryptonote::account
       return true;
     }
   }
-  MWARNING("No authorized signer with Monero address " << account_address_to_string(monero_address));
+  MWARNING("No authorized signer with Antdaza address " << account_address_to_string(monero_address));
   return false;
 }
 

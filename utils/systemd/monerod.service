@@ -1,16 +1,16 @@
 [Unit]
-Description=Monero Full Node
+Description=Antdaza Full Node
 After=network-online.target
 
 [Service]
-User=monero
-Group=monero
+User=antdaza
+Group=antdaza
 WorkingDirectory=~
-StateDirectory=monero
-LogsDirectory=monero
+StateDirectory=antdaza
+LogsDirectory=antdaza
 
 Type=simple
-ExecStart=/usr/bin/monerod --config-file /etc/monerod.conf --non-interactive
+ExecStart=/usr/bin/antdazad --config-file /etc/antdazad.conf --non-interactive
 StandardOutput=null
 StandardError=null
 

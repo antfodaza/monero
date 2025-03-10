@@ -308,11 +308,11 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
   if (m_hardfork == nullptr)
   {
     if (m_nettype ==  FAKECHAIN || m_nettype == STAGENET)
-      m_hardfork = new HardFork(*db, 1, 0);
+      m_hardfork = new HardFork(*db, 7, 0);
     else if (m_nettype == TESTNET)
       m_hardfork = new HardFork(*db, 1, testnet_hard_fork_version_1_till);
     else
-      m_hardfork = new HardFork(*db, 1, mainnet_hard_fork_version_1_till);
+      m_hardfork = new HardFork(*db, 7, mainnet_hard_fork_version_1_till);
   }
   if (m_nettype == FAKECHAIN)
   {
@@ -1359,13 +1359,47 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     MERROR_VER("block weight " << cumulative_block_weight << " is bigger than allowed for this blockchain");
     return false;
   }
+
+if (already_generated_coins != 0 )
+   {
+     uint64_t ant_reward = get_ant_reward(m_db->height(), base_reward);
+ 
+     if (b.miner_tx.vout.back().amount != ant_reward)
+     {
+       MERROR("Ant reward amount incorrect.  Should be: " << print_money(ant_reward) << ", is: " << print_money(b.miner_tx.vout.back().amount));
+       return false;
+     }
+ 
+     std::string ant_address_str;
+     switch (m_nettype)
+     {
+       case STAGENET:
+         ant_address_str = ::config::stagenet::ANT_ADDRESS;
+         break;
+       case TESTNET:
+         ant_address_str = ::config::testnet::ANT_ADDRESS;
+         break;
+       case MAINNET:
+         ant_address_str = ::config::ANT_ADDRESS;
+         break;
+       default:
+         return false;
+     }
+ 
+     if (!validate_ant_reward_key(m_db->height(), ant_address_str, b.miner_tx.vout.size() - 1, boost::get<txout_to_key>(b.miner_tx.vout.back().target).key, m_nettype))
+     {
+       MERROR("Ant reward public key incorrect.");
+       return false;
+     }
+   }
+ 
   if(base_reward + fee < money_in_use)
   {
     MERROR_VER("coinbase transaction spend too much money (" << print_money(money_in_use) << "). Block reward is " << print_money(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee) << "), cumulative_block_weight " << cumulative_block_weight);
     return false;
   }
   // From hard fork 2 till 12, we allow a miner to claim less block reward than is allowed, in case a miner wants less dust
-  if (version < 2 || version >= HF_VERSION_EXACT_COINBASE)
+  if (version >= HF_VERSION_EXACT_COINBASE)
   {
     if(base_reward + fee != money_in_use)
     {
