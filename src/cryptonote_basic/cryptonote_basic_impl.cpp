@@ -91,16 +91,10 @@ namespace cryptonote {
     {
       base_reward = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
     }
- /*    if (version <= 1 )
-     {
-       base_reward = 7492989779944505344 * COIN;
-      } else if (version >= 16) {
-       base_reward = 2500 * COIN;
-      }
-*/
+
     if (already_generated_coins == 0)
     {
-      reward = 22500000000000000;
+      reward = 35141322690702;
       return true;
     }
     uint64_t full_reward_zone = get_min_block_weight(version);

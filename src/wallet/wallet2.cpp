@@ -3416,7 +3416,8 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   refresh(trusted_daemon, start_height, blocks_fetched, received_money);
 }
 //----------------------------------------------------------------------------------------------------
-void check_block_hard_fork_version(cryptonote::network_type nettype, uint8_t hf_version, uint64_t height, bool &wallet_is_outdated, bool &daemon_is_outdated)
+void check_block_hard_fork_version(cryptonote::network_type nettype, uint8_t hf_version, uint64_t height, bool &wallet_is_outdated,
+ bool &daemon_is_outdated)
 {
   const size_t wallet_num_hard_forks = nettype == TESTNET ? num_testnet_hard_forks
     : nettype == STAGENET ? num_stagenet_hard_forks : num_mainnet_hard_forks;
@@ -3427,11 +3428,11 @@ void check_block_hard_fork_version(cryptonote::network_type nettype, uint8_t hf_
   if (wallet_is_outdated)
     return;
 
-  // check block's height falls within wallet's expected range for block's given version
-  uint64_t start_height = hf_version == 1 ? 0 : wallet_hard_forks[hf_version - 1].height;
+  // Ensure HF 7 starts from height 0
+  uint64_t start_height = (hf_version == 7) ? 0 : wallet_hard_forks[hf_version - 7].height;
   uint64_t end_height = static_cast<size_t>(hf_version) + 1 > wallet_num_hard_forks
     ? std::numeric_limits<uint64_t>::max()
-    : wallet_hard_forks[hf_version].height;
+    : wallet_hard_forks[hf_version - 6].height;  // Adjusted index to align with HF 7 as base
 
   daemon_is_outdated = height < start_height || height >= end_height;
 }

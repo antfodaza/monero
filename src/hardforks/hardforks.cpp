@@ -32,73 +32,48 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
 
 const hardfork_t mainnet_hard_forks[] = {
-  // version 1 from the start of the blockchain
-/*   { 1, 1, 0,  1341378000 },
-   { 2, 10, 0, 1640996700 },
-   { 3, 20, 0, 1640996697 },
-   { 4, 60, 0, 1640996700 },
-   { 5, 80, 0, 1640996710 },
-   { 6, 90, 0, 1640996770 },*/
-   { 7, 100, 0, 1640996830 },
-   { 8, 110, 0, 1640996890 },
-   { 9, 120, 0, 1640996950 },
-   { 10, 130, 0, 1640997070 },
-   { 11, 140, 0, 1640997190 },
-   { 12, 150, 0, 1640997310 },
-   { 13, 160, 0, 1640997370 },
-   { 14, 170, 0, 1640997610 },
-   { 14, 170, 0, 1640997610 },
-   { 14, 170, 0, 1640997610 },
+  // version 7 from the start of the blockchain
+   { 7, 100, 0, 1741702600 },
+   { 8, 109, 0, 1741705066},
+   { 9, 117, 0, 1741705246 },
+   { 10, 125, 0, 1741706446 },
+   { 11, 130, 0, 1741707046 },
+   { 12, 145, 0, 1741707526 },
+   { 13, 150, 0, 1741707766 },
+   { 14, 160, 0, 1741707946 },
+   { 15, 165, 0, 1741708246 },
+   { 16, 170, 0, 1741709446 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
-const uint64_t mainnet_hard_fork_version_1_till = 1009826;
+const uint64_t mainnet_hard_fork_version_1_till = 109;
 
 const hardfork_t testnet_hard_forks[] = {
-  // version 1 from the start of the blockchain
-  { 1, 1, 0, 1341378000 },
-
-  // version 2 starts from block 624634, which is on or around the 23rd of November, 2015. Fork time finalised on 2015-11-20. No fork voting occurs for the v2 fork.
-  { 2, 624634, 0, 1445355000 },
-
-  // versions 3-5 were passed in rapid succession from September 18th, 2016
-  { 3, 800500, 0, 1472415034 },
-  { 4, 801219, 0, 1472415035 },
-  { 5, 802660, 0, 1472415036 + 86400*180 }, // add 5 months on testnet to shut the update warning up since there's a large gap to v6
-
-  { 6, 971400, 0, 1501709789 },
-  { 7, 1057027, 0, 1512211236 },
-  { 8, 1057058, 0, 1533211200 },
-  { 9, 1057778, 0, 1533297600 },
-  { 10, 1154318, 0, 1550153694 },
-  { 11, 1155038, 0, 1550225678 },
-  { 12, 1308737, 0, 1569582000 },
-  { 13, 1543939, 0, 1599069376 },
-  { 14, 1544659, 0, 1599069377 },
-  { 15, 1982800, 0, 1652727000 },
-  { 16, 1983520, 0, 1652813400 },
+  // version 7 from the start of the blockchain
+   { 7, 100, 0, 1741702600 },
+   { 8, 109, 0, 1741705066},
+   { 9, 117, 0, 1741705246 },
+   { 10, 125, 0, 1741706446 },
+   { 11, 130, 0, 1741707046 },
+   { 12, 145, 0, 1741707526 },
+   { 13, 150, 0, 1741707766 },
+   { 14, 160, 0, 1741707946 },
+   { 15, 165, 0, 1741708246 },
+   { 16, 170, 0, 1741709446 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
-const uint64_t testnet_hard_fork_version_1_till = 624633;
+const uint64_t testnet_hard_fork_version_1_till = 109;
 
 const hardfork_t stagenet_hard_forks[] = {
-  // version 1 from the start of the blockchain
-  { 1, 1, 0, 1341378000 },
-
-  // versions 2-7 in rapid succession from March 13th, 2018
-  { 2, 32000, 0, 1521000000 },
-  { 3, 33000, 0, 1521120000 },
-  { 4, 34000, 0, 1521240000 },
-  { 5, 35000, 0, 1521360000 },
-  { 6, 36000, 0, 1521480000 },
-  { 7, 37000, 0, 1521600000 },
-  { 8, 176456, 0, 1537821770 },
-  { 9, 177176, 0, 1537821771 },
-  { 10, 269000, 0, 1550153694 },
-  { 11, 269720, 0, 1550225678 },
-  { 12, 454721, 0, 1571419280 },
-  { 13, 675405, 0, 1598180817 },
-  { 14, 676125, 0, 1598180818 },
-  { 15, 1151000, 0, 1656629117 },
-  { 16, 1151720, 0, 1656629118 },
+  // version 7 from the start of the blockchain
+   { 7, 100, 0, 1741702600 },
+   { 8, 109, 0, 1741705066},
+   { 9, 117, 0, 1741705246 },
+   { 10, 125, 0, 1741706446 },
+   { 11, 130, 0, 1741707046 },
+   { 12, 145, 0, 1741707526 },
+   { 13, 150, 0, 1741707766 },
+   { 14, 160, 0, 1741707946 },
+   { 15, 165, 0, 1741708246 },
+   { 16, 170, 0, 1741709446 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);

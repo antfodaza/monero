@@ -2514,26 +2514,8 @@ skip:
   bool t_cryptonote_protocol_handler<t_core>::on_connection_synchronized()
   {
     bool val_expected = false;
-    uint64_t current_blockchain_height = m_core.get_current_blockchain_height();
-    if(!m_core.is_within_compiled_block_hash_area(current_blockchain_height) && m_synchronized.compare_exchange_strong(val_expected, true))
+    if(m_synchronized.compare_exchange_strong(val_expected, true))
     {
-      if ((current_blockchain_height > m_sync_start_height) && (m_sync_spans_downloaded > 0))
-      {
-        uint64_t synced_blocks = current_blockchain_height - m_sync_start_height;
-        // Report only after syncing an "interesting" number of blocks:
-        if (synced_blocks > 20)
-        {
-          const boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
-          uint64_t synced_seconds = (now - m_sync_start_time).total_seconds();
-          if (synced_seconds == 0)
-          {
-            synced_seconds = 1;
-          }
-          float blocks_per_second = (1000 * synced_blocks / synced_seconds) / 1000.0f;
-          MGINFO_YELLOW("Synced " << synced_blocks << " blocks in "
-            << tools::get_human_readable_timespan(synced_seconds) << " (" << blocks_per_second << " blocks per second)");
-        }
-      }
       MGINFO_YELLOW(ENDL << "**********************************************************************" << ENDL
         << "You are now synchronized with the network. You may now start antdaza-wallet-cli." << ENDL
         << ENDL
@@ -2558,27 +2540,6 @@ skip:
     }
     m_core.safesyncmode(true);
     m_p2p->clear_used_stripe_peers();
-
-    // ask for txpool complement from any suitable node if we did not yet
-    val_expected = true;
-    if (m_ask_for_txpool_complement.compare_exchange_strong(val_expected, false))
-    {
-      m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id, uint32_t support_flags)->bool
-      {
-        if(context.m_state < cryptonote_connection_context::state_synchronizing)
-        {
-          MDEBUG(context << "not ready, ignoring");
-          return true;
-        }
-        if (!request_txpool_complement(context))
-        {
-          MERROR(context << "Failed to request txpool complement");
-          return true;
-        }
-        return false;
-      });
-    }
-
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------

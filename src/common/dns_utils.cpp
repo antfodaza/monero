@@ -322,7 +322,7 @@ DNSResolver::~DNSResolver()
     delete m_data;
   }
 }
-
+/*
 std::vector<std::string> DNSResolver::get_record(const std::string& url, int record_type, boost::optional<std::string> (*reader)(const char *,size_t), bool& dnssec_available, bool& dnssec_valid)
 {
   std::vector<std::string> addresses;
@@ -358,20 +358,20 @@ std::vector<std::string> DNSResolver::get_record(const std::string& url, int rec
 
   return addresses;
 }
-
+*/
 std::vector<std::string> DNSResolver::get_ipv4(const std::string& url, bool& dnssec_available, bool& dnssec_valid)
 {
-  return get_record(url, DNS_TYPE_A, ipv4_to_string, dnssec_available, dnssec_valid);
+  return {};//get_record(url, DNS_TYPE_A, ipv4_to_string, dnssec_available, dnssec_valid);
 }
 
 std::vector<std::string> DNSResolver::get_ipv6(const std::string& url, bool& dnssec_available, bool& dnssec_valid)
 {
-  return get_record(url, DNS_TYPE_AAAA, ipv6_to_string, dnssec_available, dnssec_valid);
+  return {}; // get_record(url, DNS_TYPE_AAAA, ipv6_to_string, dnssec_available, dnssec_valid);
 }
 
 std::vector<std::string> DNSResolver::get_txt_record(const std::string& url, bool& dnssec_available, bool& dnssec_valid)
 {
-  return get_record(url, DNS_TYPE_TXT, txt_to_string, dnssec_available, dnssec_valid);
+  return {}; // get_record(url, DNS_TYPE_TXT, txt_to_string, dnssec_available, dnssec_valid);
 }
 
 std::vector<std::string> DNSResolver::get_tlsa_tcp_record(const boost::string_ref url, const boost::string_ref port, bool& dnssec_available, bool& dnssec_valid)
@@ -382,7 +382,7 @@ std::vector<std::string> DNSResolver::get_tlsa_tcp_record(const boost::string_re
   service_addr.append(port.data(), port.size());
   service_addr.append("._tcp.");
   service_addr.append(url.data(), url.size());
-  return get_record(service_addr, DNS_TYPE_TLSA, tlsa_to_string, dnssec_available, dnssec_valid);
+  return {};//get_record(service_addr, DNS_TYPE_TLSA, tlsa_to_string, dnssec_available, dnssec_valid);
 }
 
 std::string DNSResolver::get_dns_format_from_oa_address(const std::string& oa_addr)
