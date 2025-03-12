@@ -40,7 +40,7 @@
 #define TX_EXTRA_MERGE_MINING_TAG           0x03
 #define TX_EXTRA_TAG_ADDITIONAL_PUBKEYS     0x04
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG   0xDE
-
+#define TX_EXTRA_TAG_TOKEN		    0x09
 #define TX_EXTRA_NONCE_PAYMENT_ID           0x00
 #define TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID 0x01
 
@@ -174,11 +174,58 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  struct tx_extra_token
+  {
+    enum class token_type : uint8_t { CREATE, TRANSFER };
+
+    token_type type;
+    std::string name;                     // Project Name
+    std::string symbol;                   // Token Symbol
+    uint64_t max_supply = 0;              // Maximum Supply (CREATE only)
+    cryptonote::account_public_address issuer{}; // Issuer Address (CREATE only)
+    uint64_t amount = 0;                  // Amount (TRANSFER only)
+    crypto::hash token_id{};              // Unique Token ID
+
+    tx_extra_token() = default;
+
+    tx_extra_token(token_type t, const std::string& n, const std::string& s, const crypto::hash& id,
+                   uint64_t ms = 0, const cryptonote::account_public_address& iss = {}, uint64_t amt = 0)
+      : type(t), name(n), symbol(s), max_supply(ms), issuer(iss), amount(amt), token_id(id) {}
+
+    BEGIN_SERIALIZE_OBJECT()
+      uint8_t type_as_int = static_cast<uint8_t>(type);
+      FIELD(type_as_int);
+      
+      if (!typename Archive<W>::is_saving()) // Deserialize case
+        type = static_cast<token_type>(type_as_int);
+
+      FIELD(name);
+      FIELD(symbol);
+      FIELD(token_id);
+
+      if (type == token_type::CREATE)
+      {
+        FIELD(max_supply);
+        FIELD(issuer);
+      }
+      else if (type == token_type::TRANSFER)
+      {
+        FIELD(amount);
+      }
+    END_SERIALIZE()
+  };
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
   //   varint data[];
-  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate> tx_extra_field;
+  typedef boost::variant<tx_extra_padding,
+			 tx_extra_pub_key,
+			 tx_extra_nonce,
+			 tx_extra_merge_mining_tag,
+		 	 tx_extra_additional_pub_keys,
+			 tx_extra_mysterious_minergate,
+			 tx_extra_token> tx_extra_field;
 }
 
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_padding, TX_EXTRA_TAG_PADDING);
@@ -187,3 +234,4 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_nonce, TX_EXTRA_NONCE);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_merge_mining_tag, TX_EXTRA_MERGE_MINING_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_additional_pub_keys, TX_EXTRA_TAG_ADDITIONAL_PUBKEYS);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_token, TX_EXTRA_TAG_TOKEN);

@@ -631,6 +631,7 @@ namespace cryptonote
     if (!pick<tx_extra_merge_mining_tag>(nar, tx_extra_fields, TX_EXTRA_MERGE_MINING_TAG)) return false;
     if (!pick<tx_extra_mysterious_minergate>(nar, tx_extra_fields, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG)) return false;
     if (!pick<tx_extra_padding>(nar, tx_extra_fields, TX_EXTRA_TAG_PADDING)) return false;
+    if (!pick<tx_extra_token>(nar, tx_extra_fields, TX_EXTRA_TAG_TOKEN)) return false;
 
     // if not empty, someone added a new type and did not add a case above
     if (!tx_extra_fields.empty())
@@ -721,6 +722,32 @@ namespace cryptonote
     tx_extra.resize(tx_extra.size() + tx_extra_str.size());
     memcpy(&tx_extra[pos], tx_extra_str.data(), tx_extra_str.size());
     return true;
+  }
+  //---------------------------------------------------------------
+   bool add_tx_extra(std::vector<uint8_t>& extra, tx_extra_token& token_data)
+  {
+    try
+    {
+        // Serialize token_data into a binary format
+        std::ostringstream oss;
+        binary_archive<true> ar(oss);
+        if (!::do_serialize(ar, token_data))
+        {
+            LOG_ERROR("Failed to serialize tx_extra_token");
+            return false;
+        }
+
+        // Append serialized data to extra
+        std::string serialized_data = oss.str();
+        extra.insert(extra.end(), serialized_data.begin(), serialized_data.end());
+
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        LOG_ERROR("Exception while serializing tx_extra_token: " << e.what());
+        return false;
+    }
   }
   //---------------------------------------------------------------
   bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const blobdata& extra_nonce)

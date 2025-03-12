@@ -860,10 +860,10 @@ private:
     };
 
     struct crypto_hash_less {
-    bool operator()(const crypto::hash &a, const crypto::hash &b) const {
-        return std::memcmp(&a, &b, sizeof(crypto::hash)) < 0;
-     }
-   };
+        bool operator()(const crypto::hash &a, const crypto::hash &b) const {
+           return std::memcmp(&a, &b, sizeof(crypto::hash)) < 0;
+       }
+    };
     // BEGIN: Added token-related public declarations
     struct token_info {
       std::string name;
@@ -1989,7 +1989,7 @@ private:
     serializable_unordered_map<crypto::hash, std::vector<crypto::secret_key>> m_additional_tx_keys;
 
     // BEGIN: Added token-related private members
-    std::map<crypto::hash, tools::wallet2::token_info, crypto_hash_less> m_tokens; // token_id -> info
+    std::map<crypto::hash, tools::wallet2::token_info> m_tokens; // token_id -> info
     std::vector<std::tuple<crypto::hash, crypto::hash, uint64_t, cryptonote::account_public_address, uint64_t>> m_token_transfers; // txid, token_id, amount, recipient, height
     // END: Added token-related private members
 

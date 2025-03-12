@@ -1303,6 +1303,59 @@ bool simple_wallet::exchange_multisig_keys_main(const std::vector<std::string> &
     return true;
 }
 
+//----------------------------------------------------------------------
+bool simple_wallet::create_token(const std::vector<std::string>& args)
+{
+    if (args.size() < 3)
+    {
+        fail_msg_writer() << tr("Usage: create_token <name> <symbol> <max_supply>");
+        return true;
+    }
+
+    std::string name = args[0];
+    std::string symbol = args[1];
+    uint64_t max_supply;
+    if (!cryptonote::parse_amount(max_supply, args[2]) || max_supply == 0)
+    {
+        fail_msg_writer() << tr("Invalid max supply");
+        return true;
+    }
+
+    SCOPED_WALLET_UNLOCK();
+    try
+    {
+        cryptonote::account_public_address issuer = m_wallet->get_subaddress({m_current_subaddress_account, 0});
+        std::vector<cryptonote::tx_destination_entry> dsts = {{1 /* piconero */, issuer, false}};
+
+        // Generate unique token ID
+        std::string token_data_str = name + symbol + std::to_string(max_supply) +
+                                     cryptonote::get_account_address_as_str(m_wallet->nettype(), false, issuer);
+        crypto::hash token_id = crypto::cn_fast_hash(token_data_str.data(), token_data_str.size());
+
+        std::vector<uint8_t> extra;
+
+        // Corrected order of parameters
+        tx_extra_token token_data{tx_extra_token::token_type::CREATE, name, symbol, token_id, max_supply, issuer, 0};
+
+        if (!add_tx_extra(extra, token_data))  // Corrected function usage
+        {
+            fail_msg_writer() << tr("Failed to serialize token data");
+            return true;
+        }
+
+        auto ptx_vector = m_wallet->create_transactions_2(dsts, 0, 0, extra, m_current_subaddress_account, std::set<uint32_t>{0}, {});
+        commit_or_save(ptx_vector, false);
+
+        success_msg_writer() << tr("Token ") << name << " (" << symbol << ") created with max supply " << max_supply << ", ID: "
+                             << epee::string_tools::pod_to_hex(token_id);
+    }
+    catch (const std::exception& e)
+    {
+        fail_msg_writer() << tr("Error: ") << e.what();
+    }
+    return true;
+}
+//--------------------------------------------------------------------
 bool simple_wallet::export_multisig(const std::vector<std::string> &args)
 {
   CHECK_MULTISIG_ENABLED();
@@ -1370,6 +1423,96 @@ bool simple_wallet::export_multisig_main(const std::vector<std::string> &args, b
   return true;
 }
 
+//-----------------------------------------------------------------------------
+bool simple_wallet::transfer_token(const std::vector<std::string>& args)
+{
+  if (args.size() < 3)
+  {
+    fail_msg_writer() << tr("Usage: transfer_token <token_id> <amount> <address>");
+    return true;
+  }
+
+  crypto::hash token_id;
+  if (!epee::string_tools::hex_to_pod(args[0], token_id))
+  {
+    fail_msg_writer() << tr("Invalid token ID");
+    return true;
+  }
+
+  uint64_t amount;
+  if (!cryptonote::parse_amount(amount, args[1]) || amount == 0)
+  {
+    fail_msg_writer() << tr("Invalid amount");
+    return true;
+  }
+
+  cryptonote::address_parse_info info;
+  if (!cryptonote::get_account_address_from_str(info, m_wallet->nettype(), args[2]))
+  {
+    fail_msg_writer() << tr("Invalid address");
+    return true;
+  }
+
+  SCOPED_WALLET_UNLOCK();
+  try
+  {
+    const auto& tokens = m_wallet->get_tokens();
+    auto it = tokens.find(token_id);
+    if (it == tokens.end())
+    {
+      fail_msg_writer() << tr("Token ID not found");
+      return true;
+    }
+
+    std::vector<cryptonote::tx_destination_entry> dsts = {{1, info.address, info.is_subaddress}};
+    std::vector<uint8_t> extra;
+
+    // Corrected order of parameters
+    tx_extra_token token_data{
+        tx_extra_token::token_type::TRANSFER, 
+        it->second.name, 
+        it->second.symbol, 
+        token_id,
+        amount, 
+        it->second.issuer, // Assuming it->second contains issuer address
+        0
+    };
+
+    add_tx_extra(extra, token_data); // Corrected function usage
+
+    auto ptx_vector = m_wallet->create_transactions_2(dsts, 0, 0, extra, m_current_subaddress_account, std::set<uint32_t>{0}, {});
+    commit_or_save(ptx_vector, false);
+    success_msg_writer() << tr("Transferred ") << amount << " " << it->second.symbol << " to " << args[2];
+  }
+  catch (const std::exception& e)
+  {
+    fail_msg_writer() << tr("Error: ") << e.what();
+  }
+  return true;
+}
+////////////////////////////////////////////////////////////////--
+bool simple_wallet::list_tokens(const std::vector<std::string>& args)
+{
+  const auto& tokens = m_wallet->get_tokens();
+  if (tokens.empty())
+  {
+    success_msg_writer() << tr("No tokens created.");
+    return true;
+  }
+
+  success_msg_writer() << tr("Created tokens:");
+  for (const auto& pair : tokens)
+  {
+    const auto& id = pair.first;
+    const auto& info = pair.second;
+    success_msg_writer() << tr("  ") << info.name << " (" << info.symbol << "): max supply " << info.max_supply 
+                         << ", issuer " << cryptonote::get_account_address_as_str(m_wallet->nettype(), false, info.issuer)
+                         << ", ID " << epee::string_tools::pod_to_hex(id)
+                         << ", total transferred " << info.total_transferred;
+  }
+  return true;
+}
+//----------------------------------------------------------------------
 bool simple_wallet::import_multisig(const std::vector<std::string> &args)
 {
   CHECK_MULTISIG_ENABLED();
@@ -3435,10 +3578,14 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("bc_height",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::show_blockchain_height, _1),
                            tr("Show the blockchain height."));
-  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::on_command, this, &simple_wallet::transfer, _1),
+
+ m_cmd_binder.set_handler("create_token", boost::bind(&simple_wallet::create_token, this, _1), tr("create_token <name> <symbol> <max_supply>"));
+ m_cmd_binder.set_handler("transfer_token", boost::bind(&simple_wallet::transfer_token, this, _1), tr("transfer_token <token_id> <amount> <address>"));
+ m_cmd_binder.set_handler("list_tokens", boost::bind(&simple_wallet::list_tokens, this, _1), tr("List all tokens"));
+ m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::on_command, this, &simple_wallet::transfer, _1),
                            tr(USAGE_TRANSFER),
                            tr("Transfer <amount> to <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority. If omitted, the default value (see the command \"set priority\") is used. <ring_size> is the number of inputs to include for untraceability. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 ANTD including fees, and addr1 & addr3 would receive 2.925 & 0.975 ANTD, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations."));
-  m_cmd_binder.set_handler("sweep_unmixable",
+ m_cmd_binder.set_handler("sweep_unmixable",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sweep_unmixable, _1),
                            tr("Send all unmixable outputs to yourself with ring_size 1"));
   m_cmd_binder.set_handler("sweep_all", boost::bind(&simple_wallet::on_command, this, &simple_wallet::sweep_all, _1),
@@ -6068,6 +6215,26 @@ bool simple_wallet::refresh_main(uint64_t start_height, enum ResetType reset, bo
     // Clear line "Height xxx of xxx"
     std::cout << "\r                                                                \r";
     success_msg_writer(true) << tr("Refresh done, blocks received: ") << fetched_blocks;
+    // BEGIN: Add token-related display logic here
+    const auto& tokens = m_wallet->get_tokens();
+    if (!tokens.empty())
+    {
+      message_writer() << tr("Token information updated:");
+      for (const auto& [token_id, token_info] : tokens)
+      {
+        ss.str(""); // Clear the stringstream
+        ss << tr("  Token ID: ") << epee::string_tools::pod_to_hex(token_id)
+           << tr(", Name: ") << token_info.name
+           << tr(", Symbol: ") << token_info.symbol
+           << tr(", Total Transferred: ") << token_info.total_transferred;
+        message_writer() << ss.str();
+      }
+    }
+    else
+    {
+      message_writer() << tr("No tokens found in wallet.");
+    }
+    // END: Add token-related display logic here
     if (is_init)
       print_accounts();
     show_balance_unlocked();

@@ -2311,6 +2311,37 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   }
   const std::vector<tx_extra_field> &tx_extra_fields = tx_cache_data.tx_extra_fields.empty() ? local_tx_extra_fields : tx_cache_data.tx_extra_fields;
 
+
+  tx_extra_token token_data;
+  if (find_tx_extra_field_by_type(tx_extra_fields, token_data))
+  {
+    if (token_data.type == tx_extra_token::token_type::CREATE)
+    {
+      token_info info{
+        token_data.name, token_data.symbol, token_data.max_supply, 
+        token_data.issuer, token_data.token_id, txid, height, 0
+      };
+      m_tokens[token_data.token_id] = info;
+      LOG_PRINT_L2("Token created: " << token_data.name << " (" << token_data.symbol << "), ID: " << epee::string_tools::pod_to_hex(token_data.token_id));
+    }
+    else if (token_data.type == tx_extra_token::token_type::TRANSFER)
+    {
+      auto it = m_tokens.find(token_data.token_id);
+       if (it != m_tokens.end())
+       {
+         if (it->second.total_transferred + token_data.amount <= it->second.max_supply)
+         {
+          m_token_transfers.emplace_back(txid, token_data.token_id, token_data.amount, m_account.get_keys().m_account_address, height);
+          it->second.total_transferred += token_data.amount;
+          LOG_PRINT_L2("Token transfer: " << token_data.name << " (" << token_data.amount << ")");
+         }
+         else
+         {
+           LOG_ERROR("Transfer exceeds max supply for token ID: " << epee::string_tools::pod_to_hex(token_data.token_id));
+   	 }
+	}
+     }
+  }
   // Don't try to extract tx public key if tx has no ouputs
   size_t pk_index = 0;
   std::vector<tx_scan_info_t> tx_scan_info(tx.vout.size());

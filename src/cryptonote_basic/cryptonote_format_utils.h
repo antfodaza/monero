@@ -79,6 +79,7 @@ namespace cryptonote
   bool add_tx_pub_key_to_extra(transaction& tx, const crypto::public_key& tx_pub_key);
   bool add_tx_pub_key_to_extra(transaction_prefix& tx, const crypto::public_key& tx_pub_key);
   bool add_tx_pub_key_to_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& tx_pub_key);
+  bool add_tx_extra(std::vector<uint8_t>& extra,  tx_extra_token& token_data);
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const std::vector<uint8_t>& tx_extra);
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const transaction_prefix& tx);
   bool add_additional_tx_pub_keys_to_extra(std::vector<uint8_t>& tx_extra, const std::vector<crypto::public_key>& additional_pub_keys);
