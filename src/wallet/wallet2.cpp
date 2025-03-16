@@ -3329,22 +3329,25 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
 //----------------------------------------------------------------------------------------------------
 void check_block_hard_fork_version(cryptonote::network_type nettype, uint8_t hf_version, uint64_t height, bool &wallet_is_outdated, bool &daemon_is_outdated)
 {
-  const size_t wallet_num_hard_forks = nettype == TESTNET ? num_testnet_hard_forks
-    : nettype == STAGENET ? num_stagenet_hard_forks : num_mainnet_hard_forks;
-  const hardfork_t *wallet_hard_forks = nettype == TESTNET ? testnet_hard_forks
-    : nettype == STAGENET ? stagenet_hard_forks : mainnet_hard_forks;
+    // Default to the first version (7) if no match is found
+    uint8_t expected_version = mainnet_hard_forks[0].version; // 7
 
-  wallet_is_outdated = static_cast<size_t>(hf_version) > wallet_num_hard_forks;
-  if (wallet_is_outdated)
-    return;
+    // Iterate through the hard fork table to find the expected version for the given height
+    for (size_t i = 0; i < num_mainnet_hard_forks; ++i)
+    {
+        if (height >= mainnet_hard_forks[i].height)
+        {
+            expected_version = mainnet_hard_forks[i].version;
+        }
+        else
+        {
+            break; // Stop once we pass the height
+        }
+    }
 
-  // check block's height falls within wallet's expected range for block's given version
-  uint64_t start_height = hf_version == 1 ? 0 : wallet_hard_forks[hf_version - 1].height;
-  uint64_t end_height = static_cast<size_t>(hf_version) + 1 > wallet_num_hard_forks
-    ? std::numeric_limits<uint64_t>::max()
-    : wallet_hard_forks[hf_version].height;
-
-  daemon_is_outdated = height < start_height || height >= end_height;
+    // Determine if wallet or daemon is outdated based on the version comparison
+    wallet_is_outdated = hf_version > expected_version;  // Wallet supports a newer version not yet active
+    daemon_is_outdated = hf_version < expected_version;  // Daemon is behind the expected version
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::pull_and_parse_next_blocks(bool first, bool try_incremental, uint64_t start_height, uint64_t &blocks_start_height, std::list<crypto::hash> &short_chain_history, const std::vector<cryptonote::block_complete_entry> &prev_blocks, const std::vector<parsed_block> &prev_parsed_blocks, std::vector<cryptonote::block_complete_entry> &blocks, std::vector<parsed_block> &parsed_blocks, bool &last, bool &error, std::exception_ptr &exception)
