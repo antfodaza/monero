@@ -7020,7 +7020,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::create_token(const std::vector<std::string>& args) {
   if (args.size() != 3) {
-    fail_msg_writer() << tr("Usage: create_token <name> <symbol> <max_supply>");
+    PRINT_USAGE(USAGE_CREATE_TOKEN);
     return true;
   }
 
