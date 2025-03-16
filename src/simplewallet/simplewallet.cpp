@@ -284,6 +284,7 @@ namespace
   const char* USAGE_HELP("help [<command> | all]");
   const char* USAGE_APROPOS("apropos <keyword> [<keyword> ...]");
   const char* USAGE_SCAN_TX("scan_tx <txid> [<txid> ...]");
+  const char* USAGE_CREATE_TOKEN("create_token <name> <symbol> <max_supply>");
 
   std::string input_line(const std::string& prompt, bool yesno = false)
   {
@@ -3313,6 +3314,10 @@ simple_wallet::simple_wallet()
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::show_balance, _1),
                            tr(USAGE_SHOW_BALANCE),
                            tr("Show the wallet's balance of the currently selected account."));
+  m_cmd_binder.set_handler("create_token",
+                           boost::bind(&simple_wallet::on_command, this, &simple_wallet::create_token, _1),
+                           tr(USAGE_CREATE_TOKEN),
+                           tr("Create a new token"));
   m_cmd_binder.set_handler("incoming_transfers",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::show_incoming_transfers,_1),
                            tr(USAGE_INCOMING_TRANSFERS),
@@ -7013,7 +7018,71 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::create_token(const std::vector<std::string>& args) {
+  if (args.size() != 3) {
+    fail_msg_writer() << tr("Usage: create_token <name> <symbol> <max_supply>");
+    return true;
+  }
 
+  std::string name = args[0];
+  std::string symbol = args[1];
+  uint64_t max_supply;
+  try {
+    max_supply = boost::lexical_cast<uint64_t>(args[2]);
+  } catch (const boost::bad_lexical_cast&) {
+    fail_msg_writer() << tr("Invalid max_supply: must be a number");
+    return true;
+  }
+
+  if (name.empty() || symbol.empty() || max_supply == 0) {
+    fail_msg_writer() << tr("Name, symbol, and max_supply must be non-empty/non-zero");
+    return true;
+  }
+
+  LOCK_IDLE_SCOPE();
+
+  try {
+    // Prepare the tx_extra with token creation data
+  cryptonote::account_public_address address = m_wallet->get_address();
+   std::vector<uint8_t> extra;
+   if (!add_account_public_address_to_tx_extra(extra, address))
+   {
+     fail_msg_writer() << tr("failed to add account public address to tx extra");
+     return true;
+   }
+
+    if (!cryptonote::add_token_create_to_tx_extra(extra, name, symbol, max_supply, address)) {
+      fail_msg_writer() << tr("Failed to add token data to transaction extra");
+      return true;
+    }
+
+    // Transaction parameters
+    uint64_t below = 0;                          // No "below" filter for inputs
+    bool is_subaddress = false;                  // Use main address (simplify for now)
+    size_t outputs = 1;                          // Single output (minimal valid tx)
+    size_t fake_outs_count = m_wallet->default_mixin(); // Use default mixin (e.g., 10 in v0.18.3.4)
+    uint32_t priority = 0;                       // Default priority (normal)
+    uint32_t account = 0;                        // Main account (index 0)
+    std::set<uint32_t> subaddr_indices;          // Empty for main address
+
+    // Create the transaction
+    auto ptx_vector = m_wallet->create_transactions_all(below, address, is_subaddress, outputs, fake_outs_count, priority, extra, account, subaddr_indices);
+    if (ptx_vector.empty()) {
+      fail_msg_writer() << tr("Failed to create token transaction");
+      return true;
+    }
+
+    // Commit the transaction to the network
+    m_wallet->commit_tx(ptx_vector[0]);
+    success_msg_writer() << tr("Token created successfully! Tx hash: ") << get_transaction_hash(ptx_vector[0].tx)
+                         << tr("\nFee: ") << print_money(ptx_vector[0].fee);
+  } catch (const std::exception& e) {
+    fail_msg_writer() << tr("Error creating token: ") << e.what();
+  }
+
+  return true;
+}
+//-------------------------------------------------------------------------
 bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)
 {
   if (!try_connect_to_daemon())

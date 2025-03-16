@@ -79,10 +79,21 @@ namespace cryptonote
   bool add_tx_pub_key_to_extra(transaction& tx, const crypto::public_key& tx_pub_key);
   bool add_tx_pub_key_to_extra(transaction_prefix& tx, const crypto::public_key& tx_pub_key);
   bool add_tx_pub_key_to_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& tx_pub_key);
+  //token
+  bool add_account_public_address_to_tx_extra(std::vector<uint8_t>& tx_extra, const cryptonote::account_public_address& address);
+   cryptonote::account_public_address get_account_public_address_from_tx_extra(const std::vector<uint8_t>& tx_extra);
+  //token end
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const std::vector<uint8_t>& tx_extra);
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const transaction_prefix& tx);
   bool add_additional_tx_pub_keys_to_extra(std::vector<uint8_t>& tx_extra, const std::vector<crypto::public_key>& additional_pub_keys);
   bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const blobdata& extra_nonce);
+  bool add_token_create_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& name, const std::string& symbol, uint64_t max_supply, const cryptonote::account_public_address& creator_address);
+  //token
+  bool add_viewkey_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& viewkey);
+   crypto::secret_key get_viewkey_from_tx_extra(const std::vector<uint8_t>& tx_extra);
+
+  bool get_token_create_from_tx_extra(const std::vector<uint8_t>& tx_extra, std::string& name, std::string& symbol, uint64_t& max_supply, cryptonote::account_public_address& creator_address);
+  //token ends
   bool add_mm_merkle_root_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::hash& mm_merkle_root, size_t mm_merkle_tree_depth);
   bool remove_field_from_tx_extra(std::vector<uint8_t>& tx_extra, const std::type_info &type);
   void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id);

@@ -34,6 +34,7 @@
 #include "string_tools.h"
 #include "string_tools_lexical.h"
 #include "serialization/string.h"
+#include "serialization/binary_utils.h"
 #include "cryptonote_format_utils.h"
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
@@ -738,7 +739,61 @@ namespace cryptonote
     memcpy(&tx_extra[start_pos], extra_nonce.data(), extra_nonce.size());
     return true;
   }
+  //----------------------------------------------------------------
+  bool add_account_public_address_to_tx_extra(std::vector<uint8_t>& tx_extra, const cryptonote::account_public_address& address)
+   {
+     tx_extra.resize(tx_extra.size() + 1 + sizeof(cryptonote::account_public_address));
+     tx_extra[tx_extra.size() - 1 - sizeof(cryptonote::account_public_address)] = TX_EXTRA_TAG_ACCOUNT_PUBLIC_ADDRESS;
+     *reinterpret_cast<cryptonote::account_public_address*>(&tx_extra[tx_extra.size() - sizeof(cryptonote::account_public_address)]) = address;
+     return true;
+   }
+   //---------------------------------------------------------------
+   cryptonote::account_public_address get_account_public_address_from_tx_extra(const std::vector<uint8_t>& tx_extra)
+   {
+     // parse
+     std::vector<tx_extra_field> tx_extra_fields;
+     parse_tx_extra(tx_extra, tx_extra_fields);
+     // find corresponding field
+     tx_extra_account_public_address address;
+     if (!find_tx_extra_field_by_type(tx_extra_fields, address))
+       return cryptonote::account_public_address{ crypto::null_pkey, crypto::null_pkey };
+     return cryptonote::account_public_address{ address.m_spend_public_key, address.m_view_public_key };
+   }
   //---------------------------------------------------------------
+  // Add token creation data to tx_extra
+  bool add_token_create_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& name, const std::string& symbol, uint64_t max_supply, const cryptonote::account_public_address& creator_address) {
+  tx_extra_token_create token_data{name, symbol, max_supply, creator_address};
+  std::string serialized_data;
+  if (!::serialization::dump_binary(token_data, serialized_data)) {
+    return false;
+  }
+
+  tx_extra.push_back(TX_EXTRA_TAG_TOKEN_CREATE);
+  tx_extra.insert(tx_extra.end(), serialized_data.begin(), serialized_data.end());
+    return true;
+  }
+  //-------------------------------------------------------------------
+  // Extract token creation data from tx_extra
+  bool get_token_create_from_tx_extra(const std::vector<uint8_t>& tx_extra, std::string& name, std::string& symbol, uint64_t& max_supply, cryptonote::account_public_address& creator_address) {
+  std::vector<tx_extra_field> tx_extra_fields;
+  if (!parse_tx_extra(tx_extra, tx_extra_fields)) {
+    return false;
+  }
+
+  tx_extra_token_create token_data;
+  for (const auto& field : tx_extra_fields) {
+    if (field.type() == typeid(tx_extra_token_create)) {
+      token_data = boost::get<tx_extra_token_create>(field);
+      name = token_data.name;
+      symbol = token_data.symbol;
+      max_supply = token_data.max_supply;
+      creator_address = token_data.creator_address;
+      return true;
+      }
+    }
+    return false;
+  }
+  //--------------------------------------------------------------------
   bool add_mm_merkle_root_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::hash& mm_merkle_root, size_t mm_merkle_tree_depth)
   {
     CHECK_AND_ASSERT_MES(mm_merkle_tree_depth < 32, false, "merge mining merkle tree depth should be less than 32");

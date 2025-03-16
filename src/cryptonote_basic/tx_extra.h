@@ -30,7 +30,6 @@
 
 #pragma once
 
-
 #define TX_EXTRA_PADDING_MAX_COUNT          255
 #define TX_EXTRA_NONCE_MAX_COUNT            255
 
@@ -39,6 +38,8 @@
 #define TX_EXTRA_NONCE                      0x02
 #define TX_EXTRA_MERGE_MINING_TAG           0x03
 #define TX_EXTRA_TAG_ADDITIONAL_PUBKEYS     0x04
+#define TX_EXTRA_TAG_TOKEN_CREATE           0x05  // New tag for token creation
+#define TX_EXTRA_TAG_ACCOUNT_PUBLIC_ADDRESS 0x06
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG   0xDE
 
 #define TX_EXTRA_NONCE_PAYMENT_ID           0x00
@@ -165,6 +166,17 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  struct tx_extra_account_public_address
+   {
+     crypto::public_key m_spend_public_key;
+     crypto::public_key m_view_public_key;
+ 
+     BEGIN_SERIALIZE()
+       FIELD(m_spend_public_key)
+       FIELD(m_view_public_key)
+     END_SERIALIZE()
+   };
+
   struct tx_extra_mysterious_minergate
   {
     std::string data;
@@ -174,11 +186,36 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  // New struct for token creation
+  struct tx_extra_token_create
+  {
+    std::string name;                    // Token name (e.g., "MyToken")
+    std::string symbol;                  // Token symbol (e.g., "MTK")
+    uint64_t max_supply;                 // Maximum supply of the token
+    account_public_address creator_address; // Creator's public address
+
+    BEGIN_SERIALIZE()
+      FIELD(name)
+      FIELD(symbol)
+      VARINT_FIELD(max_supply)           // Use varint for compact representation
+      FIELD(creator_address)
+    END_SERIALIZE()
+  };
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
   //   varint data[];
-  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate> tx_extra_field;
+  typedef boost::variant<
+    tx_extra_padding,
+    tx_extra_pub_key,
+    tx_extra_nonce,
+    tx_extra_merge_mining_tag,
+    tx_extra_additional_pub_keys,
+    tx_extra_mysterious_minergate,
+    tx_extra_token_create,
+    tx_extra_account_public_address
+  > tx_extra_field;
 }
 
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_padding, TX_EXTRA_TAG_PADDING);
@@ -186,4 +223,6 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_pub_key, TX_EXTRA_TAG_PUBKEY);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_nonce, TX_EXTRA_NONCE);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_merge_mining_tag, TX_EXTRA_MERGE_MINING_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_additional_pub_keys, TX_EXTRA_TAG_ADDITIONAL_PUBKEYS);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_token_create, TX_EXTRA_TAG_TOKEN_CREATE); // Register new tag
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_account_public_address, TX_EXTRA_TAG_ACCOUNT_PUBLIC_ADDRESS);
