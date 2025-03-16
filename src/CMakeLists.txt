@@ -113,7 +113,7 @@ if(NOT IOS)
   add_subdirectory(blockchain_utilities)
 endif()
 
-if(BUILD_DEBUG_UTILITIES)
+if(CMAKE_BUILD_TYPE STREQUAL Debug)
   add_subdirectory(debug_utilities)
 endif()
 

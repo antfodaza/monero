@@ -92,6 +92,12 @@ namespace cryptonote {
       base_reward = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
     }
 
+    if (already_generated_coins == 0)
+     {
+       reward = 17592186044415;
+       return true;
+     }
+
     uint64_t full_reward_zone = get_min_block_weight(version);
 
     //make it soft

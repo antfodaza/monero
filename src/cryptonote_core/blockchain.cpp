@@ -1431,6 +1431,58 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     MERROR_VER("block weight " << cumulative_block_weight << " is bigger than allowed for this blockchain");
     return false;
   }
+
+   if (already_generated_coins != 0)
+  {
+    uint64_t ant_reward = get_ant_reward(m_db->height(), base_reward);
+
+    if (b.miner_tx.vout.back().amount != ant_reward)
+    {
+        MERROR("Ant reward amount incorrect.  Should be: " << print_money(ant_reward)
+               << ", is: " << print_money(b.miner_tx.vout.back().amount));
+        return false;
+    }
+
+    std::string ant_address_str;
+    switch (m_nettype)
+    {
+        case STAGENET:
+            ant_address_str = ::config::stagenet::ANT_ADDRESS;
+            break;
+        case TESTNET:
+            ant_address_str = ::config::testnet::ANT_ADDRESS;
+            break;
+        case MAINNET:
+            ant_address_str = ::config::ANT_ADDRESS;
+            break;
+        default:
+            return false;
+    }
+
+    uint64_t height = m_db->height();
+    crypto::public_key output_key;
+    boost::optional<crypto::view_tag> view_tag_opt = cryptonote::get_output_view_tag(b.miner_tx.vout.back());
+    if (view_tag_opt)
+    {
+        // txout_to_tagged_key
+        output_key = boost::get<txout_to_tagged_key>(b.miner_tx.vout.back().target).key;
+        if (!validate_ant_reward_key(height, ant_address_str, b.miner_tx.vout.size() - 1, output_key, m_nettype, &*view_tag_opt))
+        {
+            MERROR("Ant reward public key or view tag incorrect.");
+            return false;
+        }
+    }
+    else
+    {
+        // txout_to_key
+        output_key = boost::get<txout_to_key>(b.miner_tx.vout.back().target).key;
+        if (!validate_ant_reward_key(height, ant_address_str, b.miner_tx.vout.size() - 1, output_key, m_nettype))
+        {
+            MERROR("Ant reward public key incorrect.");
+            return false;
+        }
+    }
+  }
   if(base_reward + fee < money_in_use)
   {
     MERROR_VER("coinbase transaction spend too much money (" << print_money(money_in_use) << "). Block reward is " << print_money(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee) << "), cumulative_block_weight " << cumulative_block_weight);
