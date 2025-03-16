@@ -96,6 +96,8 @@ namespace cryptonote {
      {
        reward = 22500000000000000;
        return true;
+     } else if (version >= 16) {
+       reward = 400000000000000;
      }
 
     uint64_t full_reward_zone = get_min_block_weight(version);
