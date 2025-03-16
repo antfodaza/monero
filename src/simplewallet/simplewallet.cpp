@@ -7019,14 +7019,19 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::create_token(const std::vector<std::string>& args) {
-  if (args.size() != 3) {
-    PRINT_USAGE(USAGE_CREATE_TOKEN);
+  if (args.size() != 5) {
+    fail_msg_writer() << tr("Usage: create_token <name> <symbol> <max_supply> <address> <amount>");
+    fail_msg_writer() << tr("Example: create_token MyToken MTK 1000000 <recipient_address> 0.1");
     return true;
   }
 
   std::string name = args[0];
   std::string symbol = args[1];
   uint64_t max_supply;
+  cryptonote::account_public_address recipient_address;
+  uint64_t amount;
+
+  // Parse max_supply
   try {
     max_supply = boost::lexical_cast<uint64_t>(args[2]);
   } catch (const boost::bad_lexical_cast&) {
@@ -7034,48 +7039,74 @@ bool simple_wallet::create_token(const std::vector<std::string>& args) {
     return true;
   }
 
-  if (name.empty() || symbol.empty() || max_supply == 0) {
-    fail_msg_writer() << tr("Name, symbol, and max_supply must be non-empty/non-zero");
+  // Parse recipient address
+  if (!cryptonote::get_account_address_from_str(recipient_address, m_wallet->testnet(), args[3])) {
+    fail_msg_writer() << tr("Invalid recipient address: ") << args[3];
+    return true;
+  }
+
+  // Parse amount
+  if (!cryptonote::parse_amount(amount, args[4])) {
+    fail_msg_writer() << tr("Invalid amount: ") << args[4];
+    return true;
+  }
+
+  if (name.empty() || symbol.empty() || max_supply == 0 || amount == 0) {
+    fail_msg_writer() << tr("Name, symbol, max_supply, and amount must be non-empty/non-zero");
     return true;
   }
 
   LOCK_IDLE_SCOPE();
 
   try {
-    // Prepare the tx_extra with token creation data
-  cryptonote::account_public_address address = m_wallet->get_address();
-   std::vector<uint8_t> extra;
-   if (!add_account_public_address_to_tx_extra(extra, address))
-   {
-     fail_msg_writer() << tr("failed to add account public address to tx extra");
-     return true;
-   }
+    // Refresh wallet and check daemon sync
+    m_wallet->refresh(false);
+    if (!m_wallet->is_trusted_daemon()) {
+      fail_msg_writer() << tr("Daemon is not trusted or not fully synced. Run 'status' in monerod to check sync.");
+      return true;
+    }
+    LOG_PRINT_L2("Wallet refreshed for token creation");
 
-    if (!cryptonote::add_token_create_to_tx_extra(extra, name, symbol, max_supply, address)) {
+    // Check unlocked balance
+    uint64_t unlocked_balance = m_wallet->unlocked_balance(0, false);
+    if (unlocked_balance < amount) {
+      fail_msg_writer() << tr("Insufficient unlocked funds: need ") << print_money(amount) << tr(", have ") << print_money(unlocked_balance);
+      return true;
+    }
+    LOG_PRINT_L2("Unlocked balance: " << print_money(unlocked_balance));
+
+    // Prepare tx_extra
+    std::vector<uint8_t> extra;
+    cryptonote::account_public_address creator_address = m_wallet->get_address();
+    if (!add_account_public_address_to_tx_extra(extra, creator_address)) {
+      fail_msg_writer() << tr("Failed to add creator address to tx extra");
+      return true;
+    }
+    if (!cryptonote::add_token_create_to_tx_extra(extra, name, symbol, max_supply, creator_address)) {
       fail_msg_writer() << tr("Failed to add token data to transaction extra");
       return true;
     }
 
-    // Transaction parameters
-    uint64_t below = 0;                          // No "below" filter for inputs
-    bool is_subaddress = false;                  // Use main address (simplify for now)
-    size_t outputs = 1;                          // Single output (minimal valid tx)
-    size_t fake_outs_count = m_wallet->default_mixin(); // Use default mixin (e.g., 10 in v0.18.3.4)
-    uint32_t priority = 0;                       // Default priority (normal)
-    uint32_t account = 0;                        // Main account (index 0)
-    std::set<uint32_t> subaddr_indices;          // Empty for main address
+    // Transfer to recipient address
+    std::vector<cryptonote::tx_destination_entry> dsts;
+    dsts.push_back({amount, recipient_address, false});
+    const size_t fake_outs_count = 2; // Lowered to 2 for testnet compatibility
+    const uint32_t priority = 0;
+    std::set<uint32_t> subaddr_indices = {0};
 
-    // Create the transaction
-    auto ptx_vector = m_wallet->create_transactions_all(below, address, is_subaddress, outputs, fake_outs_count, priority, extra, account, subaddr_indices);
+    auto ptx_vector = m_wallet->create_transactions_2(dsts, fake_outs_count, priority, extra, 0, subaddr_indices, {});
     if (ptx_vector.empty()) {
-      fail_msg_writer() << tr("Failed to create token transaction");
+      fail_msg_writer() << tr("Failed to create token transaction: no valid transaction constructed");
       return true;
     }
 
-    // Commit the transaction to the network
+    // Commit transaction
     m_wallet->commit_tx(ptx_vector[0]);
     success_msg_writer() << tr("Token created successfully! Tx hash: ") << get_transaction_hash(ptx_vector[0].tx)
-                         << tr("\nFee: ") << print_money(ptx_vector[0].fee);
+                         << tr("\nFee: ") << print_money(ptx_vector[0].fee)
+                         << tr("\nSent: ") << print_money(amount) << tr(" to ") << args[3];
+  } catch (const tools::error::wallet_internal_error& e) {
+    fail_msg_writer() << tr("Error creating token: ") << e.what();
   } catch (const std::exception& e) {
     fail_msg_writer() << tr("Error creating token: ") << e.what();
   }

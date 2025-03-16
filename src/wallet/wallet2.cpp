@@ -11401,6 +11401,80 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_all(uint64_t below
   return create_transactions_from(address, is_subaddress, outputs, unused_transfers_indices, unused_dust_indices, fake_outs_count, priority, extra);
 }
 
+  std::vector<wallet2::pending_tx> wallet2::create_token_transaction(
+      const cryptonote::account_public_address& address,
+      const std::vector<uint8_t>& extra,
+      uint32_t subaddr_account,
+      std::set<uint32_t> subaddr_indices)
+  {
+    std::vector<pending_tx> ptx_vector;
+
+    // Ensure wallet is up-to-date
+    refresh(false);
+    LOG_PRINT_L2("Wallet refreshed for token creation");
+
+    // Check unlocked balance
+    uint64_t unlocked_balance;
+
+    LOG_PRINT_L2("Unlocked balance for account " << subaddr_account << ": " << print_money(unlocked_balance));
+
+    // Gather inputs
+    transfer_container transfers;
+    get_transfers(transfers);
+    std::vector<size_t> unused_transfers_indices;
+    for (size_t i = 0; i < transfers.size(); ++i) {
+      const transfer_details& td = transfers[i];
+      if (!td.m_spent && td.m_subaddr_index.major == subaddr_account &&
+          subaddr_indices.count(td.m_subaddr_index.minor) == 1 && is_transfer_unlocked(td)) {
+        unused_transfers_indices.push_back(i);
+        LOG_PRINT_L2("Selected input: " << print_money(td.amount()) << " at subaddress index " << td.m_subaddr_index.minor);
+      }
+    }
+    if (unused_transfers_indices.empty()) {
+       THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("No suitable unspent outputs found in specified account/subaddresses"));
+    }
+
+    // Transaction parameters
+    const size_t fake_outs_count = default_mixin() > 0 ? default_mixin() : 2; // Minimum 2 if mixin is 0
+    const uint32_t priority = 0;                    // Normal priority
+    const uint64_t token_amount = 10000;            // 0.00001 XMR (small output)
+
+    // Estimate fee
+    size_t tx_weight = estimate_tx_weight(true, unused_transfers_indices.size(), fake_outs_count, 1, extra.size(),
+                                          true, true, false, true); // Hardcode v0.18.3.4 settings
+    uint64_t base_fee = get_base_fee(priority);
+    uint64_t fee = base_fee * tx_weight;
+    LOG_PRINT_L2("Estimated tx weight: " << tx_weight << ", base fee: " << print_money(base_fee) << ", total fee: " << print_money(fee));
+
+    // Verify sufficient funds
+    uint64_t total_input = 0;
+    for (size_t idx : unused_transfers_indices) {
+      total_input += transfers[idx].amount();
+    }
+    LOG_PRINT_L2("Total input amount: " << print_money(total_input));
+    if (total_input < fee + token_amount) {
+      THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Insufficient funds: need "));
+    }
+
+    // Build transaction with create_transactions_2
+    std::vector<cryptonote::tx_destination_entry> dsts;
+    dsts.push_back({token_amount, address, false}); // Small output to self
+    unique_index_container subtract_fee_from_outputs; // Empty: fee from inputs, not outputs
+    try {
+      ptx_vector = create_transactions_2(dsts, fake_outs_count, priority, extra, subaddr_account, subaddr_indices, subtract_fee_from_outputs);
+      if (ptx_vector.empty()) {
+        LOG_PRINT_L1("create_transactions_2 returned empty vector");
+        THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Failed to construct token transaction: no valid transaction created"));
+      }
+    } catch (const std::exception& e) {
+      LOG_PRINT_L1("Exception in create_transactions_2: " << e.what());
+      THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Failed to construct token transaction: ") + std::string(e.what()));
+    }
+
+    LOG_PRINT_L2("Token transaction created with " << ptx_vector.size() << " pending tx(s)");
+    return ptx_vector;
+  }
+
 std::vector<wallet2::pending_tx> wallet2::create_transactions_single(const crypto::key_image &ki, const cryptonote::account_public_address &address, bool is_subaddress, const size_t outputs, const size_t fake_outs_count, uint32_t priority, const std::vector<uint8_t>& extra)
 {
   std::vector<size_t> unused_transfers_indices;
