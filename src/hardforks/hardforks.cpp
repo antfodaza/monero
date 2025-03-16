@@ -33,7 +33,7 @@
 
 const hardfork_t mainnet_hard_forks[] = {
   // version 1 from the start of the blockchain
-  { 1, 10, 0, 1341378000 },
+  { 7, 1, 0, 1341378000 },
   { 12, 12, 0, 1571419280 },
   { 15, 100, 0, 1656629117 },
   { 16, 101, 0, 1656629118 },

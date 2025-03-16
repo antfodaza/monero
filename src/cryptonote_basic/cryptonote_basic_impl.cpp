@@ -94,7 +94,7 @@ namespace cryptonote {
 
     if (already_generated_coins == 0)
      {
-       reward = 17592186044415;
+       reward = 22500000000000000;
        return true;
      }
 
