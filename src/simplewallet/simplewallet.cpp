@@ -7018,54 +7018,120 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::create_token(const std::vector<std::string>& args_)
+bool simple_wallet::create_token(const std::vector<std::string>& args)
 {
-    if (args_.size() < 3) {
+    // Validate the number of arguments
+    if (args.size() < 3) {
         fail_msg_writer() << "Usage: create_token <name> <symbol> <max_supply>";
-        return false;
+        return true;
     }
 
-    std::string name = args_[0];
-    std::string symbol = args_[1];
+    // Parse the input arguments
+    std::string name = args[0];
+    std::string symbol = args[1];
     uint64_t max_supply;
-    if (!epee::string_tools::get_xtype_from_string(max_supply, args_[2])) {
-        fail_msg_writer() << "Invalid max supply value.";
-        return false;
+    try {
+        max_supply = boost::lexical_cast<uint64_t>(args[2]);
+    }
+    catch (const boost::bad_lexical_cast&) {
+        fail_msg_writer() << "Invalid max_supply: must be a positive number";
+        return true;
     }
 
-    cryptonote::account_public_address creator_address = m_wallet->get_account().get_keys().m_account_address;
+    // Ensure the wallet is initialized
+    if (!m_wallet) {
+        fail_msg_writer() << "Wallet is not initialized";
+        return true;
+    }
+
+    // Retrieve the creator's public address
+    cryptonote::account_public_address creator_address = m_wallet->get_account().get_public_address();
+
+    // Generate a new address for the token
+    cryptonote::account_base token_account;
+    token_account.generate();
+    cryptonote::account_public_address token_address = token_account.get_keys().m_account_address;
+
+    // Serialize token data into the transaction's extra field
     std::vector<uint8_t> tx_extra;
-    if (!add_token_create_to_tx_extra(tx_extra, name, symbol, max_supply, creator_address)) {
-        fail_msg_writer() << "Failed to add token creation data to tx_extra.";
-        return false;
+    bool success = cryptonote::create_token(
+        tx_extra,
+        name,
+        symbol,
+        max_supply,
+        creator_address,
+        token_address
+    );
+    if (!success) {
+        fail_msg_writer() << "Failed to create token data";
+        return true;
     }
-
-    uint32_t priority = 0;  // Default priority
-    size_t fake_outs_count = 0;
-    uint32_t subaddr_account = 0;
-    std::set<uint32_t> subaddr_indices;
-    std::vector<cryptonote::tx_destination_entry> dsts;
-
-    cryptonote::tx_destination_entry de;
-    de.addr = creator_address;
-    de.amount = 0; // Token creation doesn't require actual transfer
-    dsts.push_back(de);
 
     try {
-        auto ptx_vector = m_wallet->create_transactions_2(dsts, fake_outs_count, priority, tx_extra, subaddr_account, subaddr_indices);
-        if (ptx_vector.empty()) {
-            fail_msg_writer() << "Transaction was not constructed.";
-            return false;
+        // Define transaction destinations (minimal payment for validity)
+        std::vector<cryptonote::tx_destination_entry> dsts;
+        cryptonote::tx_destination_entry de;
+        de.amount = 1; // Minimal amount to ensure transaction validity
+        de.addr = creator_address;
+        dsts.push_back(de);
+
+        // Set transaction parameters
+        uint64_t unlock_time = 0;       // No unlock time restriction
+        uint32_t priority = 1;          // Normal priority
+        uint32_t subaddr_account = 0;   // Default subaddress account
+        std::set<uint32_t> subaddr_indices; // No specific subaddresses
+
+        // Construct the token transaction
+        cryptonote::transaction tx;
+        std::vector<size_t> selected_transfers;
+        success = m_wallet->create_token_transaction(
+            dsts,
+            tx_extra,
+            unlock_time,
+            priority,
+            subaddr_account,
+            subaddr_indices,
+            tx,
+            selected_transfers,
+            name,
+            symbol,
+            max_supply,
+            token_address
+        );
+        if (!success) {
+            fail_msg_writer() << "Failed to create token transaction";
+            return true;
         }
 
-        // Commit transaction
-        m_wallet->commit_tx(ptx_vector);
-        success_msg_writer() << "Token creation transaction successfully submitted.";
-        return true;
-    } catch (const std::exception& e) {
-        fail_msg_writer() << "Exception during token creation: " << e.what();
-        return false;
+        // Prepare the pending transaction structure
+        wallet2::pending_tx ptx;
+        ptx.tx = tx;
+        ptx.fee = m_wallet->get_base_fee(); // Use the wallet's last calculated fee
+        ptx.dust = 0;                       // No dust handling in this simplified case
+        ptx.dust_added_to_fee = true;       // Assume dust is added to fee
+        ptx.change_dts = dsts[0];           // Change goes back to creator (simplified)
+        ptx.selected_transfers = selected_transfers;
+        ptx.tx_key = m_wallet->get_tx_key(get_transaction_hash(tx)); // Transaction key for proof
+        ptx.construction_data.subaddr_account = subaddr_account;
+        ptx.construction_data.subaddr_indices = subaddr_indices;
+        ptx.dests = dsts;
+
+        // Commit the transaction to the daemon
+        m_wallet->commit_tx(ptx);
+
+        // Provide success feedback to the user
+        success_msg_writer() << "Token created and sent successfully!"
+                           << "\nName: " << name
+                           << "\nSymbol: " << symbol
+                           << "\nMax Supply: " << max_supply
+                           << "\nToken Address: " << cryptonote::get_account_address_as_str(m_wallet->nettype(), false, token_address);
     }
+    catch (const std::exception& e) {
+        fail_msg_writer() << "Error creating and sending token: " << e.what();
+        return true;
+    }
+
+    return true;
 }
 //-------------------------------------------------------------------------
 bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)

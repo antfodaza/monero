@@ -40,6 +40,7 @@
 #define TX_EXTRA_TAG_ADDITIONAL_PUBKEYS     0x04
 #define TX_EXTRA_TAG_TOKEN_CREATE           0x05  // New tag for token creation
 #define TX_EXTRA_TAG_ACCOUNT_PUBLIC_ADDRESS 0x06
+#define TX_EXTRA_TAG_TOKEN_CREATE_WITH_ADDRESS 0x07
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG   0xDE
 
 #define TX_EXTRA_NONCE_PAYMENT_ID           0x00
@@ -202,6 +203,22 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+struct tx_extra_token_create_with_address {
+    std::string name;                    // Token name (e.g., "MyToken")
+    std::string symbol;                  // Token symbol (e.g., "MTK")
+    uint64_t max_supply;                 // Maximum supply of the token
+    account_public_address creator_address; // Creator's public address
+    account_public_address token_address;   // Address for the token itself
+
+    BEGIN_SERIALIZE()
+        FIELD(name)
+        FIELD(symbol)
+        VARINT_FIELD(max_supply)
+        FIELD(creator_address)
+        FIELD(token_address)
+    END_SERIALIZE()
+};
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
@@ -214,7 +231,8 @@ namespace cryptonote
     tx_extra_additional_pub_keys,
     tx_extra_mysterious_minergate,
     tx_extra_token_create,
-    tx_extra_account_public_address
+    tx_extra_account_public_address,
+    tx_extra_token_create_with_address
   > tx_extra_field;
 }
 
@@ -226,3 +244,4 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_additional_pub_keys, TX_EXTRA_T
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_token_create, TX_EXTRA_TAG_TOKEN_CREATE); // Register new tag
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_account_public_address, TX_EXTRA_TAG_ACCOUNT_PUBLIC_ADDRESS);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_token_create_with_address, TX_EXTRA_TAG_TOKEN_CREATE_WITH_ADDRESS);

@@ -820,6 +820,90 @@ namespace cryptonote
     return false;
   }
   //--------------------------------------------------------------------
+    bool create_token(
+    std::vector<uint8_t>& tx_extra,
+    const std::string& name,
+    const std::string& symbol,
+    uint64_t max_supply,
+    const cryptonote::account_public_address& creator_address,
+    const cryptonote::account_public_address& token_address)
+   {
+    // Validate inputs
+    if (name.empty() || name.size() > 32) {
+        std::cerr << "Error: Token name must be 1-32 characters long." << std::endl;
+        return false;
+    }
+    if (symbol.empty() || symbol.size() > 10) {
+        std::cerr << "Error: Token symbol must be 1-10 characters long." << std::endl;
+        return false;
+    }
+    if (max_supply == 0) {
+        std::cerr << "Error: Maximum supply must be greater than 0." << std::endl;
+        return false;
+    }
+
+    // Create token data structure with both addresses
+    tx_extra_token_create_with_address token_data{
+        name,
+        symbol,
+        max_supply,
+        creator_address,
+        token_address
+    };
+
+    // Serialize the token data
+    std::ostringstream oss;
+    binary_archive<true> ar(oss);
+    bool r = ::do_serialize(ar, token_data);
+    if (!r) {
+        std::cerr << "Error: Failed to serialize token creation data" << std::endl;
+        return false;
+    }
+
+    // Add serialized data to tx_extra
+    std::string tx_extra_str = oss.str();
+    size_t pos = tx_extra.size();
+    tx_extra.resize(tx_extra.size() + tx_extra_str.size());
+    memcpy(&tx_extra[pos], tx_extra_str.data(), tx_extra_str.size());
+
+    // Add creator address separately to tx_extra using existing function
+    if (!add_account_public_address_to_tx_extra(tx_extra, creator_address)) {
+        std::cerr << "Error: Failed to add creator address to tx_extra" << std::endl;
+        return false;
+    }
+
+    return true;
+   }
+  //--------------------------------------------------------------
+   bool get_token_creation_info(
+    const std::vector<uint8_t>& tx_extra,
+    std::string& name,
+    std::string& symbol,
+    uint64_t& max_supply,
+    cryptonote::account_public_address& creator_address,
+    cryptonote::account_public_address& token_address)
+{
+    std::vector<tx_extra_field> tx_extra_fields;
+    if (!parse_tx_extra(tx_extra, tx_extra_fields)) {
+        return false;
+    }
+
+    tx_extra_token_create_with_address token_data;
+    for (const auto& field : tx_extra_fields) {
+        if (field.type() == typeid(tx_extra_token_create_with_address)) {
+            token_data = boost::get<tx_extra_token_create_with_address>(field);
+            name = token_data.name;
+            symbol = token_data.symbol;
+            max_supply = token_data.max_supply;
+            creator_address = token_data.creator_address;
+            token_address = token_data.token_address;
+            return true;
+        }
+    }
+
+    return false;
+   }
+   //----------------------------------------------------
   bool add_mm_merkle_root_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::hash& mm_merkle_root, size_t mm_merkle_tree_depth)
   {
     CHECK_AND_ASSERT_MES(mm_merkle_tree_depth < 32, false, "merge mining merkle tree depth should be less than 32");
