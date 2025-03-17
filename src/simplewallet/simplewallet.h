@@ -172,7 +172,7 @@ namespace cryptonote
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool transfer_main(const std::vector<std::string> &args, bool called_by_mms);
     bool transfer(const std::vector<std::string> &args);
-    bool create_token(const std::vector<std::string>& args);
+    bool create_token(const std::vector<std::string> &args_);
     bool sweep_main(uint32_t account, uint64_t below, const std::vector<std::string> &args);
     bool sweep_all(const std::vector<std::string> &args);
     bool sweep_account(const std::vector<std::string> &args);

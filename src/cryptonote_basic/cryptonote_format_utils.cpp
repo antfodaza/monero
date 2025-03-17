@@ -761,17 +761,43 @@ namespace cryptonote
    }
   //---------------------------------------------------------------
   // Add token creation data to tx_extra
-  bool add_token_create_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& name, const std::string& symbol, uint64_t max_supply, const cryptonote::account_public_address& creator_address) {
-  tx_extra_token_create token_data{name, symbol, max_supply, creator_address};
-  std::string serialized_data;
-  if (!::serialization::dump_binary(token_data, serialized_data)) {
-    return false;
-  }
+  bool add_token_create_to_tx_extra(
+    std::vector<uint8_t>& tx_extra,
+    const std::string& name,
+    const std::string& symbol,
+    uint64_t max_supply,
+    const cryptonote::account_public_address& creator_address) 
+{
+    // Validate token name and symbol length
+    if (name.empty() || name.size() > 32) {
+        std::cerr << "Error: Token name must be 1-32 characters long." << std::endl;
+        return false;
+    }
+    if (symbol.empty() || symbol.size() > 10) {
+        std::cerr << "Error: Token symbol must be 1-10 characters long." << std::endl;
+        return false;
+    }
 
-  tx_extra.push_back(TX_EXTRA_TAG_TOKEN_CREATE);
-  tx_extra.insert(tx_extra.end(), serialized_data.begin(), serialized_data.end());
+    // Create the token data struct
+    tx_extra_token_create token_data{name, symbol, max_supply, creator_address};
+
+    // Serialize using binary_archive
+    std::ostringstream oss;
+    binary_archive<true> ar(oss);
+    bool r = ::do_serialize(ar, token_data);
+    if (!r) {
+        std::cerr << "Error: Failed to serialize token data" << std::endl;
+        return false;
+    }
+
+    // Convert to string and append to tx_extra
+    std::string tx_extra_str = oss.str();
+    size_t pos = tx_extra.size();
+    tx_extra.resize(tx_extra.size() + tx_extra_str.size());
+    memcpy(&tx_extra[pos], tx_extra_str.data(), tx_extra_str.size());
+
     return true;
-  }
+}
   //-------------------------------------------------------------------
   // Extract token creation data from tx_extra
   bool get_token_create_from_tx_extra(const std::vector<uint8_t>& tx_extra, std::string& name, std::string& symbol, uint64_t& max_supply, cryptonote::account_public_address& creator_address) {

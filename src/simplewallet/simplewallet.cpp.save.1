@@ -7018,8 +7018,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::create_token(const std::vector<std::string>& args_)
-{
+bool simple_wallet::create_token(const std::vector<std::string> &args_) {
     if (args_.size() < 3) {
         fail_msg_writer() << "Usage: create_token <name> <symbol> <max_supply>";
         return false;
@@ -7027,41 +7026,56 @@ bool simple_wallet::create_token(const std::vector<std::string>& args_)
 
     std::string name = args_[0];
     std::string symbol = args_[1];
-    uint64_t max_supply;
-    if (!epee::string_tools::get_xtype_from_string(max_supply, args_[2])) {
-        fail_msg_writer() << "Invalid max supply value.";
-        return false;
-    }
-
-    cryptonote::account_public_address creator_address = m_wallet->get_account().get_keys().m_account_address;
-    std::vector<uint8_t> tx_extra;
-    if (!add_token_create_to_tx_extra(tx_extra, name, symbol, max_supply, creator_address)) {
-        fail_msg_writer() << "Failed to add token creation data to tx_extra.";
-        return false;
-    }
-
-    uint32_t priority = 0;  // Default priority
-    size_t fake_outs_count = 0;
-    uint32_t subaddr_account = 0;
-    std::set<uint32_t> subaddr_indices;
-    std::vector<cryptonote::tx_destination_entry> dsts;
-
-    cryptonote::tx_destination_entry de;
-    de.addr = creator_address;
-    de.amount = 0; // Token creation doesn't require actual transfer
-    dsts.push_back(de);
+    uint64_t max_supply = 0;
 
     try {
-        auto ptx_vector = m_wallet->create_transactions_2(dsts, fake_outs_count, priority, tx_extra, subaddr_account, subaddr_indices);
+        max_supply = boost::lexical_cast<uint64_t>(args_[2]);
+    } catch (const boost::bad_lexical_cast &) {
+        fail_msg_writer() << "Invalid max_supply value. Must be a number.";
+        return false;
+    }
+
+    cryptonote::account_public_address sender_address = m_wallet->get_account().get_keys().m_account_address;
+
+    // Prepare tx_extra with token creation data
+    std::vector<uint8_t> tx_extra;
+    if (!add_token_create_to_tx_extra(tx_extra, name, symbol, max_supply, sender_address)) {
+        fail_msg_writer() << "Failed to serialize token creation data.";
+        return false;
+    }
+
+    uint64_t fee = 5000000000;  // Adjust as needed
+    uint32_t priority = 1;  // Normal priority
+    uint32_t subaddr_account = 0;  // Default account
+    std::set<uint32_t> subaddr_indices = {}; // No specific subaddresses
+
+    try {
+        // Generate transaction
+        auto ptx_vector = m_wallet->create_transactions_all(
+            0,                      // `below` (set to fee or a threshold)
+            sender_address,           // Receiver (could be self)
+            false,                    // Not a subaddress
+            1,                         // Number of outputs
+            mixin,                        // Fake outs for privacy (adjust as needed)
+            priority,                   // Transaction priority
+            tx_extra,                   // Custom tx_extra with token data
+            subaddr_account,             // Subaddress account index
+            subaddr_indices              // Subaddress indices
+        );
+
         if (ptx_vector.empty()) {
-            fail_msg_writer() << "Transaction was not constructed.";
+            fail_msg_writer() << "Failed to create token transaction.";
             return false;
         }
 
-        // Commit transaction
-        m_wallet->commit_tx(ptx_vector);
-        success_msg_writer() << "Token creation transaction successfully submitted.";
+        // Commit transaction to the blockchain
+        for (auto& ptx : ptx_vector) {
+            m_wallet->commit_tx(ptx);
+        }
+
+        success_msg_writer() << "Token creation transaction sent successfully!";
         return true;
+
     } catch (const std::exception& e) {
         fail_msg_writer() << "Exception during token creation: " << e.what();
         return false;
